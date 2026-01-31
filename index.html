@@ -405,27 +405,6 @@
         marker.on("click", () => {
           selectedMarker = marker;
           setDetailFromProps(feature.properties || {}, latlng);
-
-          // Popup con los campos mínimos (igual que detalle)
-          const ap = normStr(feature.properties.apellidos ?? feature.properties.Apellidos ?? feature.properties.APELLIDOS);
-          const no = normStr(feature.properties.nombres ?? feature.properties.Nombres ?? feature.properties.NOMBRES);
-          const pu = getPuntaje(feature.properties);
-          const pr = getProv(feature.properties);
-          const ca = getCant(feature.properties);
-
-          const html = `
-            <div style="min-width:220px;">
-              <div style="font-weight:800; margin-bottom:6px;">${ap || "—"} ${no || ""}</div>
-              <div style="font-size:12px; color:#475569; margin-bottom:6px;">
-                <b>Puntaje Registro Social:</b> ${pu || "—"}
-              </div>
-              <div style="font-size:12px; color:#475569;">
-                <b>Provincia:</b> ${pr || "—"}<br/>
-                <b>Cantón:</b> ${ca || "—"}
-              </div>
-            </div>
-          `;
-          marker.bindPopup(html).openPopup();
         });
 
         return marker;
@@ -503,3 +482,4 @@
 </script>
 </body>
 </html>
+
