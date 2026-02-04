@@ -522,6 +522,8 @@
   function applyFilters(){
     clearSelection();
 
+        clearPolygonSelectionAll();
+
     const prov = provSel.value;
     const cant = cantSel.value;
     const q = normStr(searchBox.value).toLowerCase();
@@ -648,6 +650,7 @@
 </script>
 </body>
 </html>
+
 
 
 
