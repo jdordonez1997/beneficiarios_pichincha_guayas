@@ -570,11 +570,34 @@
           fillOpacity: 0.85
         });
 
+        
+        // Guardamos properties para export
+        marker.__props = (feature.properties || {});
+        marker.__latlng = latlng;
+
         marker.on("click", () => {
+          // Si está activo el modo selección: toggle selección por clic (opcional)
+          if (selectionMode){
+            if (selectedMarkersSet.has(marker)){
+              selectedMarkersSet.delete(marker);
+              styleMarkerSelected(marker, false);
+            } else {
+              selectedMarkersSet.add(marker);
+              styleMarkerSelected(marker, true);
+            }
+
+            selectedRows = Array.from(selectedMarkersSet).map(m => m.__props || {});
+            setSelInfo(`Seleccionados: ${selectedRows.length}`);
+            setSelButtons();
+            return; // NO abrir detalle
+          }
+
+          // Modo normal: abre detalle como antes
           selectedMarker = marker;
-          setDetailFromProps(feature.properties || {}, latlng);
+          setDetailFromProps(marker.__props || {}, latlng);
         });
 
+        
         return marker;
       }
     });
@@ -650,6 +673,7 @@
 </script>
 </body>
 </html>
+
 
 
 
