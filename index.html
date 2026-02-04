@@ -648,6 +648,66 @@
     clearSelection();
   });
 
+    // ======= EVENTO: TERMINÓ DE DIBUJAR POLÍGONO =======
+  map.on(L.Draw.Event.CREATED, function (event) {
+    if (!selectionMode) return;
+
+    drawnItems.clearLayers();
+    const polyLayer = event.layer;
+    drawnItems.addLayer(polyLayer);
+    lastDrawnLayer = polyLayer;
+
+    // limpia selección previa
+    selectedMarkersSet.forEach(m => styleMarkerSelected(m, false));
+    selectedMarkersSet.clear();
+
+    const poly = getPolygonLatLngs(polyLayer);
+    const bounds = polyLayer.getBounds();
+
+    // Recorremos SOLO los marcadores actualmente pintados (filtrados)
+    layerGroup.eachLayer((subLayer) => {
+      if (!subLayer.eachLayer) return;
+      subLayer.eachLayer((marker) => {
+        const ll = marker.getLatLng();
+        if (!bounds.contains(ll)) return;
+
+        if (pointInPolygon({lat: ll.lat, lng: ll.lng}, poly)){
+          selectedMarkersSet.add(marker);
+          styleMarkerSelected(marker, true);
+        }
+      });
+    });
+
+    selectedRows = Array.from(selectedMarkersSet).map(m => m.__props || {});
+    setSelInfo(`Seleccionados: ${selectedRows.length}`);
+    setSelButtons();
+  });
+
+  // ======= BOTONES: SELECCIÓN POR POLÍGONO =======
+  btnSelectMode.addEventListener("click", () => {
+    selectionMode = !selectionMode;
+
+    if (selectionMode){
+      startPolygonDrawing();
+    } else {
+      setSelInfo(selectedRows.length ? `Modo normal. Seleccionados: ${selectedRows.length}` : "");
+      setSelButtons();
+    }
+  });
+
+  btnDownloadSel.addEventListener("click", () => {
+    exportSelectedToExcel();
+  });
+
+  btnClearSel.addEventListener("click", () => {
+    clearPolygonSelectionAll();
+    setSelInfo("Selección quitada. Modo normal.");
+  });
+
+  // Estado inicial de botones
+  setSelButtons();
+
+
   // ======= LOAD DATA =======
   fetch(GEOJSON_FILE)
     .then(r => {
@@ -673,6 +733,7 @@
 </script>
 </body>
 </html>
+
 
 
 
