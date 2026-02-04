@@ -18,6 +18,13 @@
     crossorigin=""
   ></script>
 
+    <!-- Leaflet.draw (selección por polígono) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+  <!-- SheetJS (exportar a Excel) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
   <style>
     :root{
       --panel-bg:#ffffff;
@@ -202,6 +209,12 @@
 
     <button id="btnClear" class="btn ghost">Limpiar</button>
 
+        <!-- Selección por polígono + export -->
+    <button id="btnSelectMode" class="btn ghost">Seleccionar beneficiarios</button>
+    <button id="btnDownloadSel" class="btn" disabled>Descargar beneficiarios seleccionados</button>
+    <button id="btnClearSel" class="btn ghost" disabled>Quitar selección</button>
+    <div id="selInfo" class="foot" style="margin-top:8px;"></div>
+
     <div class="stats" id="stats">
       <div><b>Total:</b> <span id="totalCount">0</span></div>
       <div><b>Mostrando:</b> <span id="shownCount">0</span></div>
@@ -274,6 +287,12 @@
   const searchBox = document.getElementById("searchBox");
   const btnClear = document.getElementById("btnClear");
 
+    // Selección por polígono (UI)
+  const btnSelectMode = document.getElementById("btnSelectMode");
+  const btnDownloadSel = document.getElementById("btnDownloadSel");
+  const btnClearSel = document.getElementById("btnClearSel");
+  const selInfo = document.getElementById("selInfo");
+
   const totalCountEl = document.getElementById("totalCount");
   const shownCountEl = document.getElementById("shownCount");
   const statProvEl = document.getElementById("statProv");
@@ -300,6 +319,118 @@
   let selectedMarker = null;
   let selectedLatLng = null;
 
+    // ======= SELECCIÓN POR POLÍGONO (STATE) =======
+  let selectionMode = false;                 // si está activo, clic no abre detalle
+  let selectedMarkersSet = new Set();        // marcadores seleccionados
+  let selectedRows = [];                     // filas (properties) seleccionadas
+  let lastDrawnLayer = null;                 // polígono actual
+
+  // Capa donde se dibuja el polígono
+  const drawnItems = new L.FeatureGroup();
+  map.addLayer(drawnItems);
+
+  // Control draw (no usamos toolbar; lo activamos por botón)
+  const drawControl = new L.Control.Draw({
+    edit: { featureGroup: drawnItems, edit: false, remove: false },
+    draw: {
+      polygon: {
+        allowIntersection: false,
+        showArea: true,
+        shapeOptions: { weight: 2 }
+      },
+      polyline: false,
+      rectangle: false,
+      circle: false,
+      circlemarker: false,
+      marker: false
+    }
+  });
+  map.addControl(drawControl);
+
+  function setSelInfo(msg){
+    selInfo.textContent = msg || "";
+  }
+
+  function setSelButtons(){
+    btnDownloadSel.disabled = selectedRows.length === 0;
+    btnClearSel.disabled = (!selectionMode && selectedRows.length === 0 && drawnItems.getLayers().length === 0);
+    btnSelectMode.textContent = selectionMode ? "Dibujando selección… (clic para cancelar)" : "Seleccionar beneficiarios";
+  }
+
+  function styleMarkerSelected(marker, yes){
+    marker.setStyle({
+      weight: yes ? 3 : 1,
+      opacity: 1,
+      fillOpacity: yes ? 0.98 : 0.85
+    });
+  }
+
+  function clearPolygonSelectionAll(){
+    // limpia selección y polígono, vuelve a modo normal
+    selectionMode = false;
+
+    selectedMarkersSet.forEach(m => styleMarkerSelected(m, false));
+    selectedMarkersSet.clear();
+    selectedRows = [];
+
+    drawnItems.clearLayers();
+    lastDrawnLayer = null;
+
+    setSelInfo("");
+    setSelButtons();
+  }
+
+  // Ray casting: punto dentro de polígono
+  function pointInPolygon(point, vs){
+    const x = point.lng, y = point.lat;
+    let inside = false;
+    for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+      const xi = vs[i].lng, yi = vs[i].lat;
+      const xj = vs[j].lng, yj = vs[j].lat;
+
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
+
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function getPolygonLatLngs(layer){
+    const latlngs = layer.getLatLngs();
+    return Array.isArray(latlngs[0]) ? latlngs[0] : latlngs;
+  }
+
+  function startPolygonDrawing(){
+    drawnItems.clearLayers();
+    lastDrawnLayer = null;
+
+    setSelInfo("Dibuja un polígono sobre el mapa para seleccionar beneficiarios.");
+    setSelButtons();
+
+    const drawer = new L.Draw.Polygon(map, drawControl.options.draw.polygon);
+    drawer.enable();
+  }
+
+  function exportSelectedToExcel(){
+    if (selectedRows.length === 0) return;
+
+    const rowsForExcel = selectedRows.map(props => ({
+      CI: normStr(props.cedula ?? props.CEDULA ?? props.ci ?? props.CI),
+      Apellidos: normStr(props.apellidos ?? props.Apellidos ?? props.APELLIDOS),
+      Nombres: normStr(props.nombres ?? props.Nombres ?? props.NOMBRES),
+      Puntaje: getPuntaje(props),
+      Provincia: getProv(props),
+      Canton: getCant(props),
+      Planificacion: normStr(props.planificacion ?? props.Planificacion ?? props.PLANIFICACION ?? props.PLANIFICACIÓN)
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rowsForExcel);
+    XLSX.utils.book_append_sheet(wb, ws, "Seleccionados");
+    XLSX.writeFile(wb, "beneficiarios_seleccionados.xlsx");
+  }
+  
   // ======= HELPERS =======
   function normStr(v){
     return (v ?? "").toString().trim();
@@ -517,6 +648,7 @@
 </script>
 </body>
 </html>
+
 
 
 
