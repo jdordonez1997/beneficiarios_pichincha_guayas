@@ -412,24 +412,32 @@
     drawer.enable();
   }
 
-  function exportSelectedToExcel(){
-    if (selectedRows.length === 0) return;
+ function exportSelectedToExcel(){
+  if (selectedRows.length === 0) return;
 
-    const rowsForExcel = selectedRows.map(props => ({
-      CI: normStr(props.cedula ?? props.CEDULA ?? props.ci ?? props.CI),
-      Apellidos: normStr(props.apellidos ?? props.Apellidos ?? props.APELLIDOS),
-      Nombres: normStr(props.nombres ?? props.Nombres ?? props.NOMBRES),
-      Puntaje: getPuntaje(props),
-      Provincia: getProv(props),
-      Canton: getCant(props),
-      Planificacion: normStr(props.planificacion ?? props.Planificacion ?? props.PLANIFICACION ?? props.PLANIFICACIÓN)
-    }));
+  // 1) Unimos todas las llaves (columnas) disponibles en las propiedades seleccionadas
+  const allKeys = Array.from(
+    selectedRows.reduce((set, props) => {
+      Object.keys(props || {}).forEach(k => set.add(k));
+      return set;
+    }, new Set())
+  ).sort((a,b)=>a.localeCompare(b, "es"));
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(rowsForExcel);
-    XLSX.utils.book_append_sheet(wb, ws, "Seleccionados");
-    XLSX.writeFile(wb, "beneficiarios_seleccionados.xlsx");
-  }
+  // 2) Creamos filas con TODAS las columnas (si un registro no tiene un campo, queda vacío)
+  const rowsForExcel = selectedRows.map(props => {
+    const row = {};
+    allKeys.forEach(k => {
+      const v = (props && props[k] !== undefined && props[k] !== null) ? props[k] : "";
+      row[k] = (typeof v === "object") ? JSON.stringify(v) : v; // por si hay campos tipo objeto/array
+    });
+    return row;
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rowsForExcel);
+  XLSX.utils.book_append_sheet(wb, ws, "Seleccionados");
+  XLSX.writeFile(wb, "beneficiarios_seleccionados.xlsx");
+}
   
   // ======= HELPERS =======
   function normStr(v){
@@ -733,6 +741,7 @@
 </script>
 </body>
 </html>
+
 
 
 
